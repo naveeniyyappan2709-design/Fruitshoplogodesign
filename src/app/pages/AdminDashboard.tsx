@@ -4,7 +4,7 @@ import { useAuth, API_URL } from '../contexts/AuthContext';
 import {
   BarChart3, Package, Users, IndianRupee, Loader2,
   Plus, Edit2, Trash2, Check, X, Search, ChevronDown, ChevronUp,
-  TrendingUp, ShoppingCart, Fruit, LayoutDashboard
+  TrendingUp, ShoppingCart, LayoutDashboard
 } from 'lucide-react';
 
 interface Fruit {
