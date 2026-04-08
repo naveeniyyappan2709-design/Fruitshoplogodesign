@@ -1,152 +1,163 @@
-import { ImageWithFallback } from './components/figma/ImageWithFallback';
-import { Apple, Leaf, Phone, Mail } from 'lucide-react';
+import { Routes, Route, Link, useLocation } from 'react-router';
+import { useAuth } from './contexts/AuthContext';
+import { Apple, Leaf, Phone, Mail, LogIn, LogOut, User, ShoppingCart, LayoutDashboard, Package, Home, Menu, X } from 'lucide-react';
+import { useState } from 'react';
+
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import FruitCollectionPage from './pages/FruitCollectionPage';
+import BulkOrderPage from './pages/BulkOrderPage';
+import OrderHistoryPage from './pages/OrderHistoryPage';
+import AdminDashboard from './pages/AdminDashboard';
 
 export default function App() {
-  const fruits = [
-    {
-      name: 'Bananas',
-      price: '₹40',
-      unit: 'per dozen',
-      image: 'https://images.unsplash.com/photo-1768741145043-9e67ec5da2d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxJbmRpYW4lMjBzdHJlZXQlMjBmcnVpdCUyMG1hcmtldCUyMHZlbmRvciUyMGJhbmFuYXMlMjBtYW5nb2VzfGVufDF8fHx8MTc3NTUzODA3NXww&ixlib=rb-4.1.0&q=80&w=1080',
-      alt: 'Fresh Bananas'
-    },
-    {
-      name: 'Mangoes',
-      price: '₹120',
-      unit: 'per kg',
-      image: 'https://images.unsplash.com/photo-1739125875513-86e442b75864?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxmcnVpdCUyMHZlbmRvciUyMHNob3AlMjByb2Fkc2lkZSUyMG1hcmtldCUyMEluZGlhfGVufDF8fHx8MTc3NTUzODA3Nnww&ixlib=rb-4.1.0&q=80&w=1080',
-      alt: 'Fresh Mangoes'
-    },
-    {
-      name: 'Guavas',
-      price: '₹60',
-      unit: 'per kg',
-      image: 'https://images.unsplash.com/photo-1739125875303-f95270e3d4c5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw0fHxmcnVpdCUyMHZlbmRvciUyMHNob3AlMjByb2Fkc2lkZSUyMG1hcmtldCUyMEluZGlhfGVufDF8fHx8MTc3NTUzODA3Nnww&ixlib=rb-4.1.0&q=80&w=1080',
-      alt: 'Fresh Guavas'
-    },
-    {
-      name: 'Seasonal Mix',
-      price: '₹80',
-      unit: 'per kg',
-      image: 'https://images.unsplash.com/photo-1677431647033-5dc05838ba54?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxJbmRpYW4lMjBzdHJlZXQlMjBmcnVpdCUyMG1hcmtldCUyMHZlbmRvciUyMGJhbmFuYXMlMjBtYW5nb2VzfGVufDF8fHx8MTc3NTUzODA3NXww&ixlib=rb-4.1.0&q=80&w=1080',
-      alt: 'Seasonal Fruits'
-    }
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { to: '/', label: 'Home', icon: <Home className="w-4 h-4" /> },
+    { to: '/collection', label: 'Fruits', icon: <ShoppingCart className="w-4 h-4" /> },
+    ...(isAuthenticated
+      ? [
+          { to: '/bulk-order', label: 'Bulk Order', icon: <Package className="w-4 h-4" /> },
+          { to: '/orders', label: 'My Orders', icon: <Package className="w-4 h-4" /> },
+        ]
+      : []),
+    ...(isAdmin
+      ? [{ to: '/admin', label: 'Admin', icon: <LayoutDashboard className="w-4 h-4" /> }]
+      : []),
   ];
+
+  const isActive = (path: string) => location.pathname === path;
 
   return (
     <div className="min-h-screen bg-amber-50">
-      {/* Header with Logo */}
-      <header className="bg-gradient-to-r from-orange-600 to-amber-500 text-white py-6 px-4 shadow-lg">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="bg-white rounded-full p-3 shadow-md">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-orange-600 to-amber-500 text-white py-4 px-4 shadow-lg sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+              <div className="bg-white rounded-full p-2 shadow-md">
                 <div className="flex items-center justify-center">
-                  <Apple className="w-8 h-8 text-orange-600" />
-                  <Leaf className="w-6 h-6 text-green-600 -ml-2" />
+                  <Apple className="w-6 h-6 text-orange-600" />
+                  <Leaf className="w-4 h-4 text-green-600 -ml-1.5" />
                 </div>
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Fresh Fruit Corner</h1>
-                <p className="text-orange-100">रोज़ ताज़ा फल • Daily Fresh Fruits</p>
+                <h1 className="text-xl font-bold leading-tight">MKV fruits</h1>
+                <p className="text-orange-100 text-xs">रोज़ ताज़ा फल • Daily Fresh</p>
               </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <a href="tel:+918438487646" className="flex items-center gap-2 hover:text-orange-100 transition-colors">
-                <Phone className="w-5 h-5" />
-                <span className="font-semibold">+91 84384 87646</span>
-              </a>
-              <a href="mailto:naveeniyyappan2709@gmail.com" className="flex items-center gap-2 hover:text-orange-100 transition-colors">
-                <Mail className="w-5 h-5" />
-                <span className="text-sm">naveeniyyappan2709@gmail.com</span>
-              </a>
-            </div>
+            </Link>
+
+            {/* Desktop Nav */}
+            <nav className="hidden md:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    isActive(link.to)
+                      ? 'bg-white/20 text-white'
+                      : 'text-orange-100 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {link.icon}
+                  {link.label}
+                </Link>
+              ))}
+
+              {/* Auth Button */}
+              {isAuthenticated ? (
+                <div className="flex items-center gap-2 ml-2 pl-2 border-l border-orange-400">
+                  <span className="text-sm text-orange-100 flex items-center gap-1">
+                    <User className="w-4 h-4" />
+                    {user?.name}
+                  </span>
+                  <button
+                    onClick={logout}
+                    className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/login"
+                  className="flex items-center gap-1.5 bg-white text-orange-600 hover:bg-orange-50 px-5 py-2 rounded-xl text-sm font-bold transition-all ml-2 shadow-md"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In
+                </Link>
+              )}
+            </nav>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 hover:bg-white/10 rounded-xl transition-colors"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
+
+          {/* Mobile Nav */}
+          {mobileMenuOpen && (
+            <nav className="md:hidden mt-4 pt-4 border-t border-orange-400 space-y-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    isActive(link.to) ? 'bg-white/20' : 'hover:bg-white/10'
+                  }`}
+                >
+                  {link.icon}
+                  {link.label}
+                </Link>
+              ))}
+              {isAuthenticated ? (
+                <>
+                  <div className="px-4 py-2 text-sm text-orange-200">
+                    Signed in as {user?.name}
+                  </div>
+                  <button
+                    onClick={() => { logout(); setMobileMenuOpen(false); }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 w-full text-left"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 bg-white text-orange-600 px-4 py-2.5 rounded-xl text-sm font-bold"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In
+                </Link>
+              )}
+            </nav>
+          )}
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative h-96 overflow-hidden">
-        <ImageWithFallback
-          src="https://images.unsplash.com/photo-1760791632566-f42c29df7818?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxJbmRpYW4lMjBzdHJlZXQlMjBmcnVpdCUyMG1hcmtldCUyMHZlbmRvciUyMGJhbmFuYXMlMjBtYW5nb2VzfGVufDF8fHx8MTc3NTUzODA3NXww&ixlib=rb-4.1.0&q=80&w=1080"
-          alt="Street vendor selling fresh fruits"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end">
-          <div className="text-white p-8 max-w-6xl mx-auto w-full">
-            <h2 className="text-4xl font-bold mb-2">Fresh from the Market</h2>
-            <p className="text-xl text-orange-200">Quality fruits at honest prices</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Fruits Grid */}
-      <main className="max-w-6xl mx-auto px-4 py-12">
-        <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-orange-900 mb-2">Today's Fresh Selection</h2>
-          <p className="text-orange-700">Handpicked daily from local markets</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {fruits.map((fruit, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
-            >
-              <div className="aspect-[3/4] overflow-hidden">
-                <ImageWithFallback
-                  src={fruit.image}
-                  alt={fruit.alt}
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-              <div className="p-4 bg-gradient-to-b from-white to-orange-50">
-                <h3 className="text-xl font-bold text-orange-900 mb-1">{fruit.name}</h3>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-green-700">{fruit.price}</span>
-                  <span className="text-sm text-gray-600">{fruit.unit}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Additional Market Photo */}
-        <div className="mt-12 rounded-xl overflow-hidden shadow-xl">
-          <ImageWithFallback
-            src="https://images.unsplash.com/photo-1711153468168-0a4fc13c0ac7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw1fHxmcnVpdCUyMHZlbmRvciUyMHNob3AlMjByb2Fkc2lkZSUyMG1hcmtldCUyMEluZGlhfGVufDF8fHx8MTc3NTUzODA3Nnww&ixlib=rb-4.1.0&q=80&w=1080"
-            alt="Busy roadside fruit market"
-            className="w-full h-64 object-cover"
-          />
-        </div>
-
-        {/* Info Section */}
-        <div className="mt-12 bg-white rounded-xl shadow-lg p-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-orange-100 rounded-full p-2">
-              <Leaf className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="text-2xl font-bold text-orange-900">Why Choose Us?</h3>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="text-center p-4">
-              <div className="text-3xl mb-2">🍌</div>
-              <h4 className="font-bold text-orange-900 mb-1">Farm Fresh</h4>
-              <p className="text-gray-600">Directly sourced from local farms</p>
-            </div>
-            <div className="text-center p-4">
-              <div className="text-3xl mb-2">💰</div>
-              <h4 className="font-bold text-orange-900 mb-1">Fair Prices</h4>
-              <p className="text-gray-600">Best value in the neighborhood</p>
-            </div>
-            <div className="text-center p-4">
-              <div className="text-3xl mb-2">🌞</div>
-              <h4 className="font-bold text-orange-900 mb-1">Daily Fresh</h4>
-              <p className="text-gray-600">New stock every morning</p>
-            </div>
-          </div>
-        </div>
-      </main>
+      {/* Routes */}
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/collection" element={<FruitCollectionPage />} />
+        <Route path="/bulk-order" element={<BulkOrderPage />} />
+        <Route path="/orders" element={<OrderHistoryPage />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+      </Routes>
 
       {/* Footer */}
       <footer className="bg-orange-900 text-orange-100 py-8 mt-12">
