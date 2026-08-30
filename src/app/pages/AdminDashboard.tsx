@@ -40,6 +40,13 @@ interface Stats {
   totalFruits: number;
 }
 
+interface DailyFruitSale {
+  date: string;
+  fruit_name: string;
+  total_quantity: number;
+  total_revenue: number;
+}
+
 type Tab = 'dashboard' | 'fruits' | 'orders';
 
 export default function AdminDashboard() {
@@ -49,6 +56,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [fruits, setFruits] = useState<Fruit[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [dailyFruitSales, setDailyFruitSales] = useState<DailyFruitSale[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingFruit, setEditingFruit] = useState<Partial<Fruit> | null>(null);
   const [showAddFruit, setShowAddFruit] = useState(false);
@@ -74,7 +82,10 @@ export default function AdminDashboard() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (res.ok) setStats(data.stats);
+      if (res.ok) {
+        setStats(data.stats);
+        setDailyFruitSales(data.dailyFruitSales || []);
+      }
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -233,6 +244,40 @@ export default function AdminDashboard() {
                 <p className="text-2xl font-bold">{stat.value}</p>
               </div>
             ))}
+          </div>
+
+          {/* Daily Fruit Sales Table */}
+          <div className="bg-white rounded-2xl shadow-sm border border-orange-50 overflow-hidden mt-8">
+            <div className="p-5 border-b border-orange-50">
+              <h2 className="text-xl font-bold text-orange-900">Daily Fruit Sales</h2>
+              <p className="text-sm text-gray-500">Sales breakdown per fruit for the last 7 days</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-orange-50 border-b border-orange-100">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-orange-900">Date</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-orange-900">Fruit</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-orange-900">Quantity Sold</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-orange-900">Revenue (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyFruitSales.length > 0 ? dailyFruitSales.map((sale, idx) => (
+                    <tr key={idx} className="border-b border-orange-50 hover:bg-orange-50/50 transition-colors">
+                      <td className="py-3 px-4 text-sm text-gray-700">{sale.date}</td>
+                      <td className="py-3 px-4 font-semibold text-orange-900 text-sm">{sale.fruit_name}</td>
+                      <td className="py-3 px-4 text-right font-semibold text-gray-700">{sale.total_quantity}</td>
+                      <td className="py-3 px-4 text-right font-bold text-green-700">₹{sale.total_revenue.toFixed(0)}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-gray-500">No sales data available for the last 7 days.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

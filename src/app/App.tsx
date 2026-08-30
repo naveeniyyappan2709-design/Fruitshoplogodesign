@@ -40,15 +40,12 @@ export default function App() {
           <div className="flex items-center justify-between">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-              <div className="bg-white rounded-full p-2 shadow-md">
-                <div className="flex items-center justify-center">
-                  <Apple className="w-6 h-6 text-orange-600" />
-                  <Leaf className="w-4 h-4 text-green-600 -ml-1.5" />
-                </div>
+              <div className="bg-white rounded-xl overflow-hidden shadow-md w-12 h-12 flex items-center justify-center">
+                <img src="/fruits/logo_mkv.png" alt="MKV Fruits" className="w-full h-full object-contain p-1" />
               </div>
               <div>
                 <h1 className="text-xl font-bold leading-tight">MKV fruits</h1>
-                <p className="text-orange-100 text-xs">रोज़ ताज़ा फल • Daily Fresh</p>
+                <p className="text-orange-100 text-xs text-nowrap">रोज़ ताज़ा फल • Daily Fresh</p>
               </div>
             </Link>
 

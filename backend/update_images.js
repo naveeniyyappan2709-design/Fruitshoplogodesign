@@ -2,18 +2,18 @@ const mongoose = require('mongoose');
 const Fruit = require('./models/Fruit');
 
 const imageMapping = {
-  'Bananas': '/fruits/bananas_1775554021235.png',
-  'Mangoes': '/fruits/mangoes_1775554060469.png',
-  'Guavas': '/fruits/guavas_1775554138369.png',
-  'Seasonal Mix': '/fruits/seasonal_mix_1775554180768.png',
-  'Watermelon': '/fruits/watermelon_1775554195708.png',
-  'Pomegranate': '/fruits/pomegranate_1775554228161.png',
-  'Papaya': 'https://upload.wikimedia.org/wikipedia/commons/6/68/Papaya_cross_section_BGI.jpg',
-  'Dragon Fruit': 'https://upload.wikimedia.org/wikipedia/commons/4/43/Pitaya_cross_section_ed2.jpg',
-  'Kiwi': 'https://upload.wikimedia.org/wikipedia/commons/b/b8/Kiwi_%28Actinidia_chinensis%29_1_Luc_Viatour.jpg',
-  'Sapota (Chiku)': 'https://upload.wikimedia.org/wikipedia/commons/c/c5/Sapodilla_fruit.jpg',
-  'Oranges': 'https://upload.wikimedia.org/wikipedia/commons/c/c4/Orange-Fruit-Pieces.jpg',
-  'Grapes': 'https://upload.wikimedia.org/wikipedia/commons/b/bb/Table_grapes_on_white.jpg',
+  'Bananas': 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600',
+  'Mangoes': 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=600',
+  'Guavas': 'https://images.unsplash.com/photo-1536511132770-e5058c7e8c46?w=600',
+  'Seasonal Mix': 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600',
+  'Watermelon': 'https://images.unsplash.com/photo-1589984662646-e7b2e4962f18?w=600',
+  'Pomegranate': '/pomegranate.png',
+  'Papaya': 'https://images.unsplash.com/photo-1517282009859-f000ec3b26fe?w=600',
+  'Dragon Fruit': 'https://images.unsplash.com/photo-1527325678964-54921661f888?w=600',
+  'Kiwi': '/kiwi.png',
+  'Sapota (Chiku)': '/sapota.png',
+  'Oranges': 'https://images.unsplash.com/photo-1547514701-42782101795e?w=600',
+  'Grapes': 'https://images.unsplash.com/photo-1537640538966-79f369143f8f?w=600',
 };
 
 async function updateImages() {

@@ -17,10 +17,14 @@ app.use(express.json());
 const authRoutes = require('./routes/auth');
 const fruitRoutes = require('./routes/fruits');
 const orderRoutes = require('./routes/orders');
+const reviewRoutes = require('./routes/reviews');
+const siteReviewRoutes = require('./routes/siteReviews');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/fruits', fruitRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/site-reviews', siteReviewRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

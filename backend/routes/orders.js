@@ -231,6 +231,55 @@ router.get('/admin/stats', authenticateToken, requireAdmin, async (req, res) => 
       }}
     ]);
 
+    // Daily sales volume for the last 7 days
+    const last7Days = new Date();
+    last7Days.setDate(last7Days.getDate() - 7);
+    
+    const dailySales = await Order.aggregate([
+      { $match: { 
+          created_at: { $gte: last7Days },
+          status: { $ne: 'cancelled' }
+      }},
+      { $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+          amount: { $sum: "$total_amount" },
+          count: { $sum: 1 }
+      }},
+      { $sort: { "_id": 1 } }
+    ]);
+
+    // Daily sales per fruit
+    const dailyFruitSales = await Order.aggregate([
+      { $match: { 
+          created_at: { $gte: last7Days },
+          status: { $ne: 'cancelled' }
+      }},
+      { $unwind: '$items' },
+      { $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+            fruit_id: '$items.fruit_id'
+          },
+          total_quantity: { $sum: '$items.quantity' },
+          total_revenue: { $sum: { $multiply: ['$items.quantity', '$items.price_at_order'] } }
+      }},
+      { $lookup: {
+          from: 'fruits',
+          localField: '_id.fruit_id',
+          foreignField: '_id',
+          as: 'fruitDetails'
+      }},
+      { $unwind: '$fruitDetails' },
+      { $project: {
+          _id: 0,
+          date: '$_id.date',
+          fruit_name: '$fruitDetails.name',
+          total_quantity: 1,
+          total_revenue: 1
+      }},
+      { $sort: { "date": 1, "total_quantity": -1 } }
+    ]);
+
     res.json({
       stats: {
         totalOrders,
@@ -240,7 +289,9 @@ router.get('/admin/stats', authenticateToken, requireAdmin, async (req, res) => 
         totalFruits
       },
       recentOrders,
-      popularFruits
+      popularFruits,
+      dailySales,
+      dailyFruitSales
     });
   } catch (err) {
     console.error('Get stats error:', err);

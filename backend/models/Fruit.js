@@ -34,6 +34,14 @@ const fruitSchema = new mongoose.Schema({
     type: Number,
     default: 1, // 1 for true, 0 for false to maintain frontend compatibility
   },
+  rating: {
+    type: Number,
+    default: 4.5,
+  },
+  is_deal: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: false },
   toJSON: { virtuals: true },

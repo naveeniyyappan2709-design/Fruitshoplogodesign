@@ -26,6 +26,14 @@ router.get('/', async (req, res) => {
       ];
     }
 
+    if (req.query.is_deal === 'true') {
+      query.is_deal = true;
+    }
+
+    if (req.query.max_price) {
+      query.price = { $lte: parseFloat(req.query.max_price) };
+    }
+
     const fruits = await Fruit.find(query).sort({ category: 1, name: 1 });
     res.json({ fruits });
   } catch (err) {
@@ -114,4 +122,26 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/fruits/recommendations — get top sellers and budget picks
+router.get('/recommendations', async (req, res) => {
+  try {
+    // Trending: Let's assume fruits with higher ratings are trending for now
+    // In a real app, this would be based on sales data
+    const trending = await Fruit.find({ available: 1 })
+      .sort({ rating: -1 })
+      .limit(4);
+
+    // Budget: Lowest price
+    const budget = await Fruit.find({ available: 1 })
+      .sort({ price: 1 })
+      .limit(4);
+
+    res.json({ trending, budget });
+  } catch (err) {
+    console.error('Get recommendations error:', err);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
+  }
+});
+
 module.exports = router;
+
