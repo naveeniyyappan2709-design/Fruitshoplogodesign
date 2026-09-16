@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from '../navigation';
 import { useAuth, API_URL } from '../contexts/AuthContext';
 import { ShoppingCart, Trash2, Plus, Minus, MapPin, Phone, FileText, Loader2, CheckCircle, ArrowLeft, Package } from 'lucide-react';
 

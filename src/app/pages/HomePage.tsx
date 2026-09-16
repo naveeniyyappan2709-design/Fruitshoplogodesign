@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router';
+import { Link } from '../navigation';
 import { useAuth, API_URL } from '../contexts/AuthContext';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { 
@@ -21,23 +21,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 
-interface Fruit {
-  _id: string;
-  name: string;
-  price: number;
-  unit: string;
-  image_url: string;
-  rating: number;
-  category: string;
-}
-
-interface Review {
-  _id: string;
-  user_id: { name: string };
-  fruit_id: { name: string; image_url: string };
-  rating: number;
-  comment: string;
-}
+import { LocalDB, Fruit, Review } from '../utils/localStorageDB';
 
 interface SiteReview {
   _id: string;
@@ -63,11 +47,15 @@ export default function HomePage() {
 
   const fetchSiteReviews = async () => {
     try {
-      const res = await fetch(`${API_URL}/site-reviews`);
-      const data = await res.json();
-      setSiteReviews(data.reviews || []);
-      setSiteAvgRating(data.averageRating || 0);
-      setSiteTotalReviews(data.totalReviews || 0);
+      const allReviews = JSON.parse(localStorage.getItem('fruitReviews') || '[]');
+      const siteRev = allReviews.filter((r: any) => !r.fruit_id); // General site reviews
+      
+      const total = siteRev.length;
+      const avg = total > 0 ? siteRev.reduce((acc: number, r: any) => acc + r.rating, 0) / total : 4.5;
+      
+      setSiteReviews(siteRev);
+      setSiteAvgRating(avg);
+      setSiteTotalReviews(total);
     } catch (err) {
       console.error('Failed to fetch site reviews:', err);
     }
@@ -76,17 +64,17 @@ export default function HomePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [recRes, reviewRes] = await Promise.all([
-          fetch(`${API_URL}/fruits/recommendations`),
-          fetch(`${API_URL}/reviews`)
-        ]);
+        const allFruits = LocalDB.getProducts();
         
-        const recData = await recRes.json();
-        const reviewData = await reviewRes.json();
+        // Mock recommendation logic
+        const sortedByRating = [...allFruits].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        setTrending(sortedByRating.slice(0, 4));
         
-        setTrending(recData.trending || []);
-        setBudget(recData.budget || []);
-        setReviews(reviewData.reviews || []);
+        const sortedByPrice = [...allFruits].sort((a, b) => a.price - b.price);
+        setBudget(sortedByPrice.slice(0, 4));
+        
+        const allReviews = JSON.parse(localStorage.getItem('fruitReviews') || '[]');
+        setReviews(allReviews.filter((r: any) => r.fruit_id));
         
         await fetchSiteReviews();
       } catch (err) {
@@ -104,19 +92,22 @@ export default function HomePage() {
     if (!isAuthenticated) return;
     setSubmittingReview(true);
     try {
-      const res = await fetch(`${API_URL}/site-reviews`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ rating: newReviewRating, comment: newReviewComment })
+      const allReviews = JSON.parse(localStorage.getItem('fruitReviews') || '[]');
+      const sessionUserStr = localStorage.getItem('fruitSession');
+      const sessionUser = sessionUserStr ? JSON.parse(sessionUserStr) : null;
+      
+      allReviews.push({
+        _id: Date.now().toString(),
+        user_id: { name: sessionUser?.name || 'Anonymous' },
+        rating: newReviewRating,
+        comment: newReviewComment
       });
-      if (res.ok) {
-        setNewReviewComment('');
-        setNewReviewRating(5);
-        fetchSiteReviews();
-      }
+      
+      localStorage.setItem('fruitReviews', JSON.stringify(allReviews));
+      
+      setNewReviewComment('');
+      setNewReviewRating(5);
+      fetchSiteReviews();
     } catch (err) {
       console.error('Failed to submit site review:', err);
     } finally {
@@ -253,31 +244,39 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {trending.map((fruit) => (
-              <div key={fruit._id} className="group relative">
+              <div key={fruit.id} className="group relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-orange-400 to-amber-400 rounded-3xl blur opacity-0 group-hover:opacity-20 transition duration-500" />
-                <Card className="relative h-full border-none shadow-xl shadow-orange-900/5 rounded-3xl overflow-hidden group-hover:shadow-2xl group-hover:shadow-orange-900/10 transition-all duration-500 hover:-translate-y-2">
-                  <div className="aspect-[4/5] overflow-hidden relative">
-                    <ImageWithFallback
-                      src={fruit.image_url}
-                      alt={fruit.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute top-4 right-4">
-                      <Badge className="bg-orange-500/20 backdrop-blur-md text-orange-950 border-none font-black px-3 py-1 text-xs">
-                        {fruit.rating} ★
-                      </Badge>
+                <Card className="relative h-full border-none shadow-xl shadow-orange-900/5 rounded-3xl overflow-hidden group-hover:shadow-2xl group-hover:shadow-orange-900/10 transition-all duration-500 hover:-translate-y-2 flex flex-col">
+                  <Link to={`/product/${fruit.id}`} className="block flex-1">
+                    <div className="aspect-[4/5] overflow-hidden relative">
+                      <ImageWithFallback
+                        src={fruit.image_url}
+                        alt={fruit.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute top-4 right-4">
+                        <Badge className="bg-orange-500/20 backdrop-blur-md text-orange-950 border-none font-black px-3 py-1 text-xs">
+                          {fruit.rating} ★
+                        </Badge>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-orange-950/80 to-transparent">
+                        <p className="text-white/60 text-xs font-bold uppercase tracking-widest mb-1">{fruit.category}</p>
+                        <h3 className="text-2xl font-black text-white">{fruit.name}</h3>
+                      </div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-orange-950/80 to-transparent">
-                      <p className="text-white/60 text-xs font-bold uppercase tracking-widest mb-1">{fruit.category}</p>
-                      <h3 className="text-2xl font-black text-white">{fruit.name}</h3>
-                    </div>
-                  </div>
-                  <div className="p-6 bg-white flex justify-between items-center">
+                  </Link>
+                  <div className="p-6 bg-white flex justify-between items-center mt-auto border-t border-orange-50">
                     <div>
                       <span className="text-3xl font-black text-orange-950">₹{fruit.price}</span>
                       <span className="text-xs font-bold text-gray-400 ml-1">/{fruit.unit.replace('per ', '')}</span>
                     </div>
-                    <button className="bg-orange-50 text-orange-600 p-3 rounded-2xl hover:bg-orange-600 hover:text-white transition-all">
+                    <button 
+                      onClick={() => {
+                        LocalDB.addToCart(fruit, 1);
+                        alert(`${fruit.name} added to cart`);
+                      }}
+                      disabled={fruit.stock_kg <= 0}
+                      className={`p-3 rounded-2xl transition-all ${fruit.stock_kg > 0 ? 'bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
                       <ShoppingBag className="w-5 h-5" />
                     </button>
                   </div>
@@ -388,13 +387,15 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {budget.map((fruit) => (
-              <Card key={fruit._id} className="border-none shadow-lg overflow-hidden flex flex-row group h-48 rounded-[2rem]">
+              <Card key={fruit.id} className="border-none shadow-lg overflow-hidden flex flex-row group h-48 rounded-[2rem]">
                 <div className="w-1/3 overflow-hidden">
-                  <ImageWithFallback
-                    src={fruit.image_url}
-                    alt={fruit.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
+                  <Link to={`/product/${fruit.id}`} className="block w-full h-full">
+                    <ImageWithFallback
+                      src={fruit.image_url}
+                      alt={fruit.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  </Link>
                 </div>
                 <div className="flex-1 p-8 bg-gradient-to-r from-white to-orange-50 flex flex-col justify-between relative overflow-hidden">
                   <div className="absolute top-[-20%] right-[-10%] opacity-5">
@@ -402,16 +403,24 @@ export default function HomePage() {
                   </div>
                   <div>
                     <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none mb-2 font-bold uppercase tracking-tighter">Budget Pick</Badge>
-                    <h3 className="text-2xl font-black text-orange-950">{fruit.name}</h3>
+                    <Link to={`/product/${fruit.id}`}>
+                      <h3 className="text-2xl font-black text-orange-950 hover:text-orange-600 transition-colors">{fruit.name}</h3>
+                    </Link>
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-3xl font-black text-green-700">₹{fruit.price}</span>
                       <span className="text-sm font-bold text-gray-400">/{fruit.unit.replace('per ', '')}</span>
                     </div>
-                    <Link to="/collection">
-                       <button className="font-black text-sm text-orange-600 hover:translate-x-2 transition-transform underline">Grab Deal</button>
-                    </Link>
+                    <button 
+                      onClick={() => {
+                        LocalDB.addToCart(fruit, 1);
+                        alert(`${fruit.name} added to cart`);
+                      }}
+                      disabled={fruit.stock_kg <= 0}
+                      className="font-black text-sm text-orange-600 hover:translate-x-2 transition-transform underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
+                      {fruit.stock_kg > 0 ? 'Grab Deal' : 'Out of Stock'}
+                    </button>
                   </div>
                 </div>
               </Card>

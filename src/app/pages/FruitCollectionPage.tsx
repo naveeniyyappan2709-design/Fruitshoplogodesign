@@ -1,25 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { useAuth, API_URL } from '../contexts/AuthContext';
+import { useNavigate } from '../navigation';
+import { Link } from '../navigation';
+import { useAuth } from '../contexts/AuthContext';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { Search, Filter, ShoppingCart, Loader2, Plus, Minus, Leaf } from 'lucide-react';
-
-interface Fruit {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  unit: string;
-  stock_kg: number;
-  image_url: string;
-  category: string;
-  available: number;
-}
-
-interface CartItem {
-  fruit: Fruit;
-  quantity: number;
-}
+import { LocalDB, Fruit, CartItem } from '../utils/localStorageDB';
 
 export default function FruitCollectionPage() {
   const { isAuthenticated } = useAuth();
@@ -33,17 +18,29 @@ export default function FruitCollectionPage() {
 
   useEffect(() => {
     fetchFruits();
+    
+    // Initial cart load
+    setCart(LocalDB.getCart());
+    const handleCartUpdate = () => setCart(LocalDB.getCart());
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    
+    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, [selectedCategory, searchQuery]);
 
-  const fetchFruits = async () => {
+  const fetchFruits = () => {
     try {
-      const params = new URLSearchParams();
-      if (selectedCategory !== 'all') params.set('category', selectedCategory);
-      if (searchQuery) params.set('search', searchQuery);
-
-      const res = await fetch(`${API_URL}/fruits?${params}`);
-      const data = await res.json();
-      setFruits(data.fruits);
+      const allFruits = LocalDB.getProducts();
+      let filtered = allFruits;
+      
+      if (selectedCategory !== 'all') {
+        filtered = filtered.filter(f => f.category === selectedCategory);
+      }
+      
+      if (searchQuery) {
+        filtered = filtered.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      }
+      
+      setFruits(filtered);
     } catch (err) {
       console.error('Failed to fetch fruits:', err);
     } finally {
@@ -52,47 +49,29 @@ export default function FruitCollectionPage() {
   };
 
   const addToCart = (fruit: Fruit) => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    setCart(prev => {
-      const existing = prev.find(item => item.fruit.id === fruit.id);
-      if (existing) {
-        return prev.map(item =>
-          item.fruit.id === fruit.id
-            ? { ...item, quantity: Math.min(item.quantity + 1, item.fruit.stock_kg) }
-            : item
-        );
-      }
-      return [...prev, { fruit, quantity: 1 }];
-    });
+    LocalDB.addToCart(fruit, 1);
     setShowCartNotice(fruit.name);
     setTimeout(() => setShowCartNotice(''), 2000);
   };
 
   const updateCartQuantity = (fruitId: number, delta: number) => {
-    setCart(prev =>
-      prev
-        .map(item => {
-          if (item.fruit.id === fruitId) {
-            const newQty = item.quantity + delta;
-            if (newQty <= 0) return null;
-            return { ...item, quantity: Math.min(newQty, item.fruit.stock_kg) };
-          }
-          return item;
-        })
-        .filter(Boolean) as CartItem[]
-    );
+    const item = cart.find(i => i.fruit.id === fruitId);
+    if (!item) return;
+    
+    const newQty = item.quantity + delta;
+    if (newQty > item.fruit.stock_kg) {
+      alert(`Only ${item.fruit.stock_kg} available in stock.`);
+      return;
+    }
+    
+    LocalDB.updateCartQuantity(fruitId, newQty);
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.fruit.price * item.quantity, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const goToBulkOrder = () => {
-    // Store cart in sessionStorage for the bulk order page
-    sessionStorage.setItem('bulkOrderCart', JSON.stringify(cart));
-    navigate('/bulk-order');
+  const goToCart = () => {
+    navigate('/cart');
   };
 
   const categories = [
@@ -171,7 +150,7 @@ export default function FruitCollectionPage() {
                 key={fruit.id}
                 className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-orange-50 hover:border-orange-200 group"
               >
-                <div className="aspect-square overflow-hidden relative">
+                <Link to={`/product/${fruit.id}`} className="block relative aspect-square overflow-hidden">
                   <ImageWithFallback
                     src={fruit.image_url}
                     alt={fruit.name}
@@ -188,14 +167,20 @@ export default function FruitCollectionPage() {
                       {fruit.category}
                     </span>
                   </div>
-                  {fruit.stock_kg < 50 && (
+                  {fruit.stock_kg === 0 ? (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-[2px]">
+                       <span className="bg-red-600 text-white font-black px-4 py-2 rounded-lg transform -rotate-12 border-2 border-white">
+                         OUT OF STOCK
+                       </span>
+                    </div>
+                  ) : fruit.stock_kg < 10 ? (
                     <div className="absolute top-3 right-3">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600">
-                        Low Stock
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600 shadow-sm border border-red-200">
+                        Only {fruit.stock_kg} left
                       </span>
                     </div>
-                  )}
-                </div>
+                  ) : null}
+                </Link>
 
                 <div className="p-5">
                   <h3 className="text-lg font-bold text-orange-900 mb-1">{fruit.name}</h3>
@@ -211,7 +196,7 @@ export default function FruitCollectionPage() {
                   {/* Cart Controls */}
                   <div className="mt-4">
                     {inCart ? (
-                      <div className="flex items-center justify-between bg-orange-50 rounded-xl p-2">
+                      <div className="flex items-center justify-between bg-orange-50 rounded-xl p-2 border border-orange-100">
                         <button
                           onClick={() => updateCartQuantity(fruit.id, -1)}
                           className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center text-orange-600 hover:bg-orange-100 transition-colors"
@@ -219,11 +204,12 @@ export default function FruitCollectionPage() {
                           <Minus className="w-4 h-4" />
                         </button>
                         <span className="font-bold text-orange-900 text-lg">
-                          {inCart.quantity} {fruit.unit.replace('per ', '')}
+                          {inCart.quantity}
                         </span>
                         <button
                           onClick={() => updateCartQuantity(fruit.id, 1)}
-                          className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center text-orange-600 hover:bg-orange-100 transition-colors"
+                          disabled={inCart.quantity >= fruit.stock_kg}
+                          className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50"
                         >
                           <Plus className="w-4 h-4" />
                         </button>
@@ -231,10 +217,11 @@ export default function FruitCollectionPage() {
                     ) : (
                       <button
                         onClick={() => addToCart(fruit)}
-                        className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white py-2.5 rounded-xl font-semibold hover:from-orange-600 hover:to-amber-600 transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                        disabled={fruit.stock_kg === 0}
+                        className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white py-2.5 rounded-xl font-semibold hover:from-orange-600 hover:to-amber-600 transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <ShoppingCart className="w-4 h-4" />
-                        Add to Order
+                        {fruit.stock_kg === 0 ? 'Out of Stock' : 'Add to Cart'}
                       </button>
                     )}
                   </div>
@@ -259,10 +246,10 @@ export default function FruitCollectionPage() {
             <p className="text-orange-200 text-sm">Total: ₹{cartTotal.toFixed(0)}</p>
           </div>
           <button
-            onClick={goToBulkOrder}
+            onClick={goToCart}
             className="bg-amber-400 text-orange-900 px-5 py-2.5 rounded-xl font-bold hover:bg-amber-300 transition-colors"
           >
-            Place Order →
+            View Cart →
           </button>
         </div>
       )}

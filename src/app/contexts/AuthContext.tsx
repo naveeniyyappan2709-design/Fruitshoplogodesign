@@ -1,15 +1,9 @@
 /// <reference types="vite/client" />
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { LocalDB, User } from '../utils/localStorageDB';
 
+// API_URL is kept for backwards compatibility in other files during transition, but it won't be used.
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  phone: string | null;
-  role: 'customer' | 'admin';
-}
 
 interface AuthContextType {
   user: User | null;
@@ -33,71 +27,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('fruitSession');
   }, []);
 
   // Check token on mount
   useEffect(() => {
-    const verifyToken = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const res = await fetch(`${API_URL}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-        } else {
-          logout();
-        }
-      } catch {
-        // Backend might not be running — keep token but don't logout
-        console.warn('Backend not reachable');
-      }
-      setLoading(false);
-    };
-    verifyToken();
+    LocalDB.init();
+    const sessionUser = localStorage.getItem('fruitSession');
+    if (sessionUser && token) {
+      setUser(JSON.parse(sessionUser));
+    } else {
+      logout();
+    }
+    setLoading(false);
   }, [token, logout]);
 
   const login = async (email: string, password: string) => {
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setToken(data.token);
-        setUser(data.user);
-        localStorage.setItem('token', data.token);
+      const users = LocalDB.getUsers();
+      const user = users.find(u => u.email === email && u.password === password);
+      
+      if (user) {
+        const dummyToken = `token_${Date.now()}`;
+        
+        // Remove password from session
+        const { password: _, ...userWithoutPassword } = user;
+        
+        setToken(dummyToken);
+        setUser(userWithoutPassword as User);
+        localStorage.setItem('token', dummyToken);
+        localStorage.setItem('fruitSession', JSON.stringify(userWithoutPassword));
         return { success: true };
       }
-      return { success: false, error: data.error };
+      return { success: false, error: 'Invalid email or password' };
     } catch {
-      return { success: false, error: 'Cannot connect to server. Make sure the backend is running.' };
+      return { success: false, error: 'An error occurred during login' };
     }
   };
 
   const register = async (name: string, email: string, password: string, phone: string) => {
     try {
-      const res = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, phone })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setToken(data.token);
-        setUser(data.user);
-        localStorage.setItem('token', data.token);
-        return { success: true };
+      const users = LocalDB.getUsers();
+      
+      if (users.find(u => u.email === email)) {
+        return { success: false, error: 'Email already exists' };
       }
-      return { success: false, error: data.error };
+
+      const newUser: User = {
+        id: Date.now(),
+        name,
+        email,
+        password,
+        phone,
+        role: 'customer'
+      };
+
+      users.push(newUser);
+      LocalDB.saveUsers(users);
+
+      const dummyToken = `token_${Date.now()}`;
+      
+      const { password: _, ...userWithoutPassword } = newUser;
+      
+      setToken(dummyToken);
+      setUser(userWithoutPassword as User);
+      localStorage.setItem('token', dummyToken);
+      localStorage.setItem('fruitSession', JSON.stringify(userWithoutPassword));
+      return { success: true };
     } catch {
-      return { success: false, error: 'Cannot connect to server. Make sure the backend is running.' };
+      return { success: false, error: 'An error occurred during registration' };
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { useAuth, API_URL } from '../contexts/AuthContext';
+import { useNavigate } from '../navigation';
+import { useAuth } from '../contexts/AuthContext';
+import { LocalDB } from '../utils/localStorageDB';
 import {
   BarChart3, Package, Users, IndianRupee, Loader2,
   Plus, Edit2, Trash2, Check, X, Search, ChevronDown, ChevronUp,
@@ -78,14 +79,35 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(`${API_URL}/orders/admin/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const allOrders = LocalDB.getOrders();
+      const allFruits = LocalDB.getProducts();
+      const allUsers = LocalDB.getUsers();
+
+      const totalOrders = allOrders.length;
+      const pendingOrders = allOrders.filter(o => o.status === 'pending').length;
+      const totalRevenue = allOrders.reduce((sum, o) => sum + o.total_amount, 0);
+      const totalCustomers = allUsers.filter(u => u.role === 'customer').length;
+      const totalFruits = allFruits.length;
+
+      setStats({
+        totalOrders,
+        pendingOrders,
+        totalRevenue,
+        totalCustomers,
+        totalFruits
       });
-      const data = await res.json();
-      if (res.ok) {
-        setStats(data.stats);
-        setDailyFruitSales(data.dailyFruitSales || []);
-      }
+
+      // Group sales by date for simple chart mockup
+      // Assuming today's date for all past sales
+      const mockSales = allOrders.flatMap(order => 
+        order.items.map(item => ({
+          date: new Date(order.created_at).toLocaleDateString(),
+          fruit_name: item.fruit_name,
+          total_quantity: item.quantity,
+          total_revenue: item.quantity * item.price_at_order
+        }))
+      );
+      setDailyFruitSales(mockSales.slice(0, 5)); // Just take a few for the demo
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -93,9 +115,7 @@ export default function AdminDashboard() {
 
   const fetchFruits = async () => {
     try {
-      const res = await fetch(`${API_URL}/fruits?all=true`);
-      const data = await res.json();
-      setFruits(data.fruits);
+      setFruits(LocalDB.getProducts());
     } catch (err) {
       console.error('Failed to fetch fruits:', err);
     }
@@ -103,11 +123,7 @@ export default function AdminDashboard() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch(`${API_URL}/orders/admin/all`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok) setOrders(data.orders);
+      setOrders(LocalDB.getOrders());
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     }
@@ -115,24 +131,28 @@ export default function AdminDashboard() {
 
   const saveFruit = async (fruit: Partial<Fruit>) => {
     try {
-      const isNew = !fruit.id;
-      const url = isNew ? `${API_URL}/fruits` : `${API_URL}/fruits/${fruit.id}`;
-      const method = isNew ? 'POST' : 'PUT';
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(fruit)
-      });
-
-      if (res.ok) {
-        fetchFruits();
-        setEditingFruit(null);
-        setShowAddFruit(false);
+      const allFruits = LocalDB.getProducts();
+      
+      if (fruit.id) {
+        // Update
+        const index = allFruits.findIndex(f => f.id === fruit.id);
+        if (index !== -1) {
+          allFruits[index] = { ...allFruits[index], ...fruit } as Fruit;
+        }
+      } else {
+        // Create
+        const newFruit: Fruit = {
+          ...(fruit as Fruit),
+          id: Date.now(),
+          rating: 4.5, // Default rating for new fruits
+        };
+        allFruits.push(newFruit);
       }
+
+      localStorage.setItem('fruitProducts', JSON.stringify(allFruits));
+      fetchFruits();
+      setEditingFruit(null);
+      setShowAddFruit(false);
     } catch (err) {
       console.error('Failed to save fruit:', err);
     }
@@ -141,10 +161,9 @@ export default function AdminDashboard() {
   const deleteFruit = async (id: number) => {
     if (!confirm('Are you sure you want to delete this fruit?')) return;
     try {
-      await fetch(`${API_URL}/fruits/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const allFruits = LocalDB.getProducts();
+      const updatedFruits = allFruits.filter(f => f.id !== id);
+      localStorage.setItem('fruitProducts', JSON.stringify(updatedFruits));
       fetchFruits();
     } catch (err) {
       console.error('Failed to delete fruit:', err);
@@ -153,14 +172,7 @@ export default function AdminDashboard() {
 
   const updateOrderStatus = async (orderId: number, status: string) => {
     try {
-      await fetch(`${API_URL}/orders/${orderId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status })
-      });
+      LocalDB.updateOrderStatus(orderId, status as any);
       fetchOrders();
       fetchStats();
     } catch (err) {

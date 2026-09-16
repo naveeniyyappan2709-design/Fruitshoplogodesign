@@ -1,7 +1,7 @@
-import { Routes, Route, Link, useLocation } from 'react-router';
+import { Link, useLocation } from './navigation';
 import { useAuth } from './contexts/AuthContext';
 import { Apple, Leaf, Phone, Mail, LogIn, LogOut, User, ShoppingCart, LayoutDashboard, Package, Home, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -10,18 +10,32 @@ import FruitCollectionPage from './pages/FruitCollectionPage';
 import BulkOrderPage from './pages/BulkOrderPage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import AdminDashboard from './pages/AdminDashboard';
+import ProductDetailsPage from './pages/ProductDetailsPage';
+import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
+import { LocalDB } from './utils/localStorageDB';
 
 export default function App() {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+
+  useEffect(() => {
+    const updateCartCount = () => {
+      const cart = LocalDB.getCart();
+      setCartCount(cart.reduce((sum, item) => sum + item.quantity, 0));
+    };
+    updateCartCount();
+    window.addEventListener('cartUpdated', updateCartCount);
+    return () => window.removeEventListener('cartUpdated', updateCartCount);
+  }, []);
 
   const navLinks = [
     { to: '/', label: 'Home', icon: <Home className="w-4 h-4" /> },
-    { to: '/collection', label: 'Fruits', icon: <ShoppingCart className="w-4 h-4" /> },
+    { to: '/collection', label: 'Fruits', icon: <Leaf className="w-4 h-4" /> },
     ...(isAuthenticated
       ? [
-          { to: '/bulk-order', label: 'Bulk Order', icon: <Package className="w-4 h-4" /> },
           { to: '/orders', label: 'My Orders', icon: <Package className="w-4 h-4" /> },
         ]
       : []),
@@ -90,6 +104,24 @@ export default function App() {
                   Sign In
                 </Link>
               )}
+
+              {/* Cart Button */}
+              <Link
+                to="/cart"
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ml-2 relative ${
+                  isActive('/cart')
+                    ? 'bg-white/20 text-white'
+                    : 'bg-white text-orange-600 hover:bg-orange-50'
+                }`}
+              >
+                <ShoppingCart className="w-5 h-5" />
+                <span className="font-bold">Cart</span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-orange-500 shadow-md">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
             </nav>
 
             {/* Mobile Menu Button */}
@@ -122,6 +154,21 @@ export default function App() {
                   <div className="px-4 py-2 text-sm text-orange-200">
                     Signed in as {user?.name}
                   </div>
+                  <Link
+                    to="/cart"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 w-full text-left justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4" />
+                      Cart
+                    </div>
+                    {cartCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full">
+                        {cartCount}
+                      </span>
+                    )}
+                  </Link>
                   <button
                     onClick={() => { logout(); setMobileMenuOpen(false); }}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 w-full text-left"
@@ -131,30 +178,51 @@ export default function App() {
                   </button>
                 </>
               ) : (
-                <Link
-                  to="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 bg-white text-orange-600 px-4 py-2.5 rounded-xl text-sm font-bold"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </Link>
+                <>
+                  <Link
+                    to="/cart"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 w-full text-left justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4" />
+                      Cart
+                    </div>
+                    {cartCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full">
+                        {cartCount}
+                      </span>
+                    )}
+                  </Link>
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 bg-white text-orange-600 px-4 py-2.5 rounded-xl text-sm font-bold"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Sign In
+                  </Link>
+                </>
               )}
             </nav>
           )}
         </div>
       </header>
 
-      {/* Routes */}
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/collection" element={<FruitCollectionPage />} />
-        <Route path="/bulk-order" element={<BulkOrderPage />} />
-        <Route path="/orders" element={<OrderHistoryPage />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-      </Routes>
+      {/* Routes Replacement */}
+      <main>
+        {location.pathname === '/' && <HomePage />}
+        {location.pathname === '/login' && <LoginPage />}
+        {location.pathname === '/register' && <RegisterPage />}
+        {location.pathname === '/collection' && <FruitCollectionPage />}
+        {location.pathname === '/cart' && <CartPage />}
+        {location.pathname === '/checkout' && <CheckoutPage />}
+        {location.pathname.startsWith('/product/') && <ProductDetailsPage />}
+        {location.pathname === '/bulk-order' && <BulkOrderPage />}
+        {location.pathname === '/orders' && <OrderHistoryPage />}
+        {location.pathname === '/admin' && <AdminDashboard />}
+        {!['/', '/login', '/register', '/collection', '/cart', '/checkout', '/bulk-order', '/orders', '/admin'].includes(location.pathname) && !location.pathname.startsWith('/product/') && <HomePage />}
+      </main>
 
       {/* Footer */}
       <footer className="bg-orange-900 text-orange-100 py-8 mt-12">

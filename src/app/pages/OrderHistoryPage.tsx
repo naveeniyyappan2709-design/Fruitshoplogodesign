@@ -1,27 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { useAuth, API_URL } from '../contexts/AuthContext';
+import { useNavigate } from '../navigation';
+import { Link } from '../navigation';
+import { useAuth } from '../contexts/AuthContext';
+import { LocalDB, Order } from '../utils/localStorageDB';
 import { Package, Clock, CheckCircle, Truck, XCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
-
-interface OrderItem {
-  id: number;
-  fruit_name: string;
-  quantity: number;
-  price_at_order: number;
-  unit: string;
-  image_url: string;
-}
-
-interface Order {
-  id: number;
-  status: string;
-  total_amount: number;
-  delivery_address: string;
-  phone: string;
-  notes: string;
-  created_at: string;
-  items: OrderItem[];
-}
 
 const statusConfig: Record<string, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
   pending: { icon: <Clock className="w-4 h-4" />, color: 'text-amber-700', bg: 'bg-amber-100', label: 'Pending' },
@@ -32,7 +14,7 @@ const statusConfig: Record<string, { icon: React.ReactNode; color: string; bg: s
 };
 
 export default function OrderHistoryPage() {
-  const { isAuthenticated, token } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,15 +26,17 @@ export default function OrderHistoryPage() {
       return;
     }
     fetchOrders();
-  }, [isAuthenticated, navigate, token]);
+  }, [isAuthenticated, navigate]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = () => {
     try {
-      const res = await fetch(`${API_URL}/orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok) setOrders(data.orders);
+      const allOrders = LocalDB.getOrders();
+      // Filter orders by the currently logged-in user's email
+      const userOrders = allOrders.filter(o => o.customer_email === user?.email);
+      // Sort by newest first
+      userOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setOrders(userOrders);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
