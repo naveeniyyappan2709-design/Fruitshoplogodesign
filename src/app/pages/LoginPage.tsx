@@ -118,22 +118,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Demo credentials hint */}
-        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-center flex flex-col items-center gap-3">
-          <p className="text-sm text-amber-800">
-            <span className="font-semibold">Admin Demo:</span> Testing the dashboard?
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('admin@freshfruit.com');
-              setPassword('admin123');
-            }}
-            className="text-sm bg-white border border-amber-300 text-amber-700 px-4 py-2 rounded-lg hover:bg-amber-100 font-medium transition-colors"
-          >
-            Auto-fill Admin Credentials
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { Link } from '../navigation';
-import { LocalDB, CartItem } from '../utils/localStorageDB';
+import { useNavigate, Link } from '../navigation';
+import { api } from '../utils/api';
 import { Trash2, Plus, Minus, ShoppingCart, ArrowRight } from 'lucide-react';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<any[]>([]);
+  const [couponCode, setCouponCode] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState('');
+  const [couponMsg, setCouponMsg] = useState({ text: '', type: '' });
 
   const loadCart = () => {
-    setCart(LocalDB.getCart());
+    setCart(api.getCart());
   };
 
   useEffect(() => {
@@ -21,27 +25,41 @@ export default function CartPage() {
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, []);
 
-  const updateQuantity = (fruitId: number, qty: number) => {
-    LocalDB.updateCartQuantity(fruitId, qty);
+  const updateQuantity = (fruitId: string, qty: number) => {
+    api.updateCartQuantity(fruitId, qty);
     loadCart();
   };
 
-  const removeItem = (fruitId: number) => {
-    LocalDB.removeFromCart(fruitId);
+  const removeItem = (fruitId: string) => {
+    api.removeFromCart(fruitId);
     loadCart();
   };
 
   const clearCart = () => {
     if (confirm('Are you sure you want to clear your cart?')) {
-      LocalDB.clearCart();
+      api.clearCart();
       loadCart();
     }
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.fruit.price * item.quantity), 0);
+  const subtotal = cart.reduce((sum, item) => sum + (item.fruit.sellingPrice * item.quantity), 0);
   const deliveryFee = subtotal > 0 && subtotal < 500 ? 50 : 0;
-  const discount = 0; // Can implement logic later if needed
   const grandTotal = subtotal + deliveryFee - discount;
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    try {
+      setCouponMsg({ text: 'Validating...', type: 'info' });
+      const res = await api.validateCoupon(couponCode, subtotal);
+      setDiscount(res.discount);
+      setAppliedCoupon(res.coupon_code);
+      setCouponMsg({ text: 'Coupon applied successfully!', type: 'success' });
+    } catch (e: any) {
+      setCouponMsg({ text: e.message, type: 'error' });
+      setDiscount(0);
+      setAppliedCoupon('');
+    }
+  };
 
   if (cart.length === 0) {
     return (
@@ -78,25 +96,25 @@ export default function CartPage() {
             
             <div className="divide-y divide-orange-50">
               {cart.map((item) => (
-                <div key={item.fruit.id} className="p-6 flex gap-6 items-center">
+                <div key={item.fruit._id} className="p-6 flex gap-6 items-center">
                   <div className="w-24 h-24 rounded-2xl overflow-hidden bg-orange-50 flex-shrink-0">
-                    <img src={item.fruit.image_url} alt={item.fruit.name} className="w-full h-full object-cover" />
+                    <ImageWithFallback src={item.fruit.image_url} alt={item.fruit.name} className="w-full h-full object-cover" />
                   </div>
                   
                   <div className="flex-1">
-                    <Link to={`/product/${item.fruit.id}`}>
+                    <Link to={`/product/${item.fruit._id}`}>
                       <h4 className="font-bold text-orange-950 text-lg hover:text-orange-600 transition-colors">
                         {item.fruit.name}
                       </h4>
                     </Link>
                     <p className="text-gray-500 text-sm mb-2">{item.fruit.unit}</p>
-                    <p className="font-black text-orange-600">₹{item.fruit.price}</p>
+                    <p className="font-black text-orange-600">₹{item.fruit.sellingPrice}</p>
                   </div>
 
                   <div className="flex flex-col items-end gap-4">
                     <div className="flex items-center bg-gray-100 rounded-xl p-1 shadow-inner">
                       <button 
-                        onClick={() => updateQuantity(item.fruit.id, item.quantity - 1)}
+                        onClick={() => updateQuantity(item.fruit._id, item.quantity - 1)}
                         className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm hover:text-orange-600"
                       >
                         <Minus className="w-4 h-4" />
@@ -104,10 +122,10 @@ export default function CartPage() {
                       <span className="w-10 text-center font-bold">{item.quantity}</span>
                       <button 
                         onClick={() => {
-                          if (item.quantity < item.fruit.stock_kg) {
-                            updateQuantity(item.fruit.id, item.quantity + 1);
+                          if (item.quantity < item.fruit.quantity) {
+                            updateQuantity(item.fruit._id, item.quantity + 1);
                           } else {
-                            alert(`Only ${item.fruit.stock_kg} items available in stock.`);
+                            alert(`Only ${item.fruit.quantity} items available in stock.`);
                           }
                         }}
                         className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm hover:text-orange-600"
@@ -117,7 +135,7 @@ export default function CartPage() {
                     </div>
                     
                     <button 
-                      onClick={() => removeItem(item.fruit.id)}
+                      onClick={() => removeItem(item.fruit._id)}
                       className="text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1 text-sm font-semibold"
                     >
                       <Trash2 className="w-4 h-4" /> Remove
@@ -143,9 +161,34 @@ export default function CartPage() {
                 <span>Delivery Fee</span>
                 <span className="font-bold text-gray-900">{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee.toFixed(2)}`}</span>
               </div>
+              
+              {/* Coupon Section */}
+              <div className="pt-2">
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Enter Coupon Code" 
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    className="flex-1 px-3 py-2 border border-orange-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none uppercase"
+                  />
+                  <button 
+                    onClick={applyCoupon}
+                    className="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-200 transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+                {couponMsg.text && (
+                  <p className={`text-xs mt-2 ${couponMsg.type === 'error' ? 'text-red-500' : couponMsg.type === 'success' ? 'text-green-600' : 'text-blue-500'}`}>
+                    {couponMsg.text}
+                  </p>
+                )}
+              </div>
+
               {discount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Discount</span>
+                <div className="flex justify-between text-green-600 pt-2">
+                  <span>Discount ({appliedCoupon})</span>
                   <span className="font-bold">-₹{discount.toFixed(2)}</span>
                 </div>
               )}
@@ -157,7 +200,7 @@ export default function CartPage() {
             </div>
 
             <button 
-              onClick={() => navigate('/checkout')}
+              onClick={() => navigate('/checkout', { state: { subtotal, deliveryFee, discount, coupon_code: appliedCoupon, grandTotal } })}
               className="w-full bg-orange-600 text-white font-black py-4 rounded-2xl hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
             >
               Proceed to Checkout <ArrowRight className="w-5 h-5" />

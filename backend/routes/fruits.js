@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     const query = {};
 
     if (!all) {
-      query.available = 1;
+      query.status = 'Available';
     }
 
     if (category && category !== 'all') {
@@ -22,7 +22,8 @@ router.get('/', async (req, res) => {
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { description: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -31,14 +32,46 @@ router.get('/', async (req, res) => {
     }
 
     if (req.query.max_price) {
-      query.price = { $lte: parseFloat(req.query.max_price) };
+      query.sellingPrice = { $lte: parseFloat(req.query.max_price) };
     }
 
-    const fruits = await Fruit.find(query).sort({ category: 1, name: 1 });
+    let sortObj = { category: 1, name: 1 };
+    if (req.query.sort) {
+      switch(req.query.sort) {
+        case 'price_asc': sortObj = { sellingPrice: 1 }; break;
+        case 'price_desc': sortObj = { sellingPrice: -1 }; break;
+        case 'newest': sortObj = { created_at: -1 }; break;
+        case 'popular': sortObj = { totalSoldAllTime: -1 }; break;
+        case 'rating': sortObj = { rating: -1 }; break;
+      }
+    }
+
+    const fruits = await Fruit.find(query).sort(sortObj);
     res.json({ fruits });
   } catch (err) {
     console.error('Get fruits error:', err);
     res.status(500).json({ error: 'Failed to fetch fruits' });
+  }
+});
+
+// GET /api/fruits/recommendations — get top sellers and budget picks
+router.get('/recommendations', async (req, res) => {
+  try {
+    // Trending: Let's assume fruits with higher ratings are trending for now
+    // In a real app, this would be based on sales data
+    const trending = await Fruit.find({ status: 'Available' })
+      .sort({ rating: -1 })
+      .limit(4);
+
+    // Budget: Lowest price
+    const budget = await Fruit.find({ status: 'Available' })
+      .sort({ sellingPrice: 1 })
+      .limit(4);
+
+    res.json({ trending, budget });
+  } catch (err) {
+    console.error('Get recommendations error:', err);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
   }
 });
 
@@ -59,21 +92,26 @@ router.get('/:id', async (req, res) => {
 // POST /api/fruits — add fruit (admin only)
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, description, price, unit, stock_kg, image_url, category } = req.body;
+    const { name, description, purchasePrice, sellingPrice, unit, quantity, image_url, category, status, minStock, originalPrice, discount, supplier } = req.body;
 
-    if (!name || !price) {
-      return res.status(400).json({ error: 'Name and price are required' });
+    if (!name || purchasePrice === undefined || sellingPrice === undefined) {
+      return res.status(400).json({ error: 'Name, purchasePrice, and sellingPrice are required' });
     }
 
     const fruit = await Fruit.create({
       name,
       description: description || '',
-      price,
+      purchasePrice,
+      sellingPrice,
       unit: unit || 'per kg',
-      stock_kg: stock_kg || 0,
+      quantity: quantity || 0,
       image_url: image_url || '',
       category: category || 'everyday',
-      available: 1
+      status: status || 'Available',
+      minStock: minStock || 10,
+      originalPrice,
+      discount: discount || 0,
+      supplier: supplier || ''
     });
 
     res.status(201).json({ message: 'Fruit added', fruit });
@@ -92,7 +130,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     // Only update fields that were provided
-    const updatableFields = ['name', 'description', 'price', 'unit', 'stock_kg', 'image_url', 'category', 'available'];
+    const updatableFields = ['name', 'description', 'purchasePrice', 'sellingPrice', 'unit', 'quantity', 'image_url', 'category', 'status', 'is_deal', 'minStock', 'originalPrice', 'discount', 'supplier'];
     updatableFields.forEach(field => {
       if (req.body[field] !== undefined) {
         fruit[field] = req.body[field];
@@ -119,27 +157,6 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('Delete fruit error:', err);
     res.status(500).json({ error: 'Failed to delete fruit' });
-  }
-});
-
-// GET /api/fruits/recommendations — get top sellers and budget picks
-router.get('/recommendations', async (req, res) => {
-  try {
-    // Trending: Let's assume fruits with higher ratings are trending for now
-    // In a real app, this would be based on sales data
-    const trending = await Fruit.find({ available: 1 })
-      .sort({ rating: -1 })
-      .limit(4);
-
-    // Budget: Lowest price
-    const budget = await Fruit.find({ available: 1 })
-      .sort({ price: 1 })
-      .limit(4);
-
-    res.json({ trending, budget });
-  } catch (err) {
-    console.error('Get recommendations error:', err);
-    res.status(500).json({ error: 'Failed to fetch recommendations' });
   }
 });
 

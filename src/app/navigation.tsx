@@ -2,21 +2,24 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 type NavigationContextType = {
   currentPath: string;
-  navigate: (path: string) => void;
+  currentState: any;
+  navigate: (path: string, options?: { state?: any }) => void;
 };
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [currentPath, setCurrentPath] = useState('/');
+  const [currentState, setCurrentState] = useState<any>(null);
 
-  const navigate = (path: string) => {
+  const navigate = (path: string, options?: { state?: any }) => {
     setCurrentPath(path);
+    setCurrentState(options?.state || null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <NavigationContext.Provider value={{ currentPath, navigate }}>
+    <NavigationContext.Provider value={{ currentPath, currentState, navigate }}>
       {children}
     </NavigationContext.Provider>
   );
@@ -35,7 +38,7 @@ export function useLocation() {
   if (!context) {
     throw new Error('useLocation must be used within a NavigationProvider');
   }
-  return { pathname: context.currentPath };
+  return { pathname: context.currentPath, state: context.currentState };
 }
 
 interface LinkProps {

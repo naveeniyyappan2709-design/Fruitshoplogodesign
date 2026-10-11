@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { Link } from '../navigation';
+import { useNavigate, Link, useLocation } from '../navigation';
 import { useAuth } from '../contexts/AuthContext';
-import { LocalDB, CartItem } from '../utils/localStorageDB';
+import { api } from '../utils/api';
 import { ShoppingCart, CheckCircle, IndianRupee, MapPin, Truck, ChevronRight } from 'lucide-react';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const location = useLocation();
+  const [cart, setCart] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -20,55 +21,68 @@ export default function CheckoutPage() {
   });
   
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [orderConfirmed, setOrderConfirmed] = useState<number | null>(null);
+  const [orderConfirmed, setOrderConfirmed] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login?redirect=checkout');
       return;
     }
-    const currentCart = LocalDB.getCart();
-    if (currentCart.length === 0) {
-      navigate('/collection');
+    const passedState = location.state || {};
+    if (passedState.buyNowItem) {
+      setCart([passedState.buyNowItem]);
+    } else {
+      const currentCart = api.getCart();
+      if (currentCart.length === 0) {
+        navigate('/collection');
+      }
+      setCart(currentCart);
     }
-    setCart(currentCart);
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, location.state]);
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.fruit.price * item.quantity), 0);
-  const deliveryFee = subtotal > 0 && subtotal < 500 ? 50 : 0;
-  const grandTotal = subtotal + deliveryFee;
+  const passedState = location.state || {};
+  const subtotal = passedState.subtotal || cart.reduce((sum, item) => sum + (item.fruit.sellingPrice * item.quantity), 0);
+  const deliveryFee = passedState.deliveryFee !== undefined ? passedState.deliveryFee : (subtotal > 0 && subtotal < 500 ? 50 : 0);
+  
+  const discount = passedState.discount || 0;
+  const coupon_code = passedState.coupon_code || '';
+  const grandTotal = subtotal + deliveryFee - discount;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsPlacingOrder(true);
     
-    // Simulate network delay
-    setTimeout(() => {
-      const orderId = LocalDB.createOrder({
+    try {
+      const isBuyNow = !!(location.state && location.state.buyNowItem);
+      
+      const orderRes = await api.createOrder({
         total_amount: grandTotal,
+        delivery_fee: deliveryFee,
+        discount: discount,
+        coupon_code: coupon_code,
         delivery_address: `${formData.address}, ${formData.city} - ${formData.pincode}`,
         phone: formData.phone,
         notes: `Payment: ${formData.paymentMethod.toUpperCase()}`,
-        customer_name: formData.name,
-        customer_email: user?.email || '',
         items: cart.map(c => ({
-          id: c.fruit.id,
-          fruit_name: c.fruit.name,
-          quantity: c.quantity,
-          price_at_order: c.fruit.price,
-          unit: c.fruit.unit,
-          image_url: c.fruit.image_url
+          fruit_id: c.fruit._id,
+          quantity: c.quantity
         }))
       });
       
-      LocalDB.clearCart();
-      setOrderConfirmed(orderId);
+      if (!isBuyNow) {
+        api.clearCart();
+      }
+      
+      setOrderConfirmed(orderRes.order._id);
+    } catch (err: any) {
+      alert(err.message || 'Failed to place order');
+    } finally {
       setIsPlacingOrder(false);
-    }, 1500);
+    }
   };
 
   if (orderConfirmed) {
@@ -180,22 +194,22 @@ export default function CheckoutPage() {
             
             <div className="space-y-4 mb-6">
               {cart.map((item) => (
-                <div key={item.fruit.id} className="flex gap-4">
+                <div key={item.fruit._id} className="flex gap-4">
                   <div className="w-16 h-16 rounded-xl overflow-hidden bg-orange-50 flex-shrink-0">
-                    <img src={item.fruit.image_url} alt={item.fruit.name} className="w-full h-full object-cover" />
+                    <ImageWithFallback src={item.fruit.image_url} alt={item.fruit.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1">
                     <p className="font-bold text-orange-900 text-sm line-clamp-1">{item.fruit.name}</p>
                     <p className="text-gray-500 text-xs">Qty: {item.quantity}</p>
                   </div>
                   <div className="font-bold text-gray-900">
-                    ₹{item.fruit.price * item.quantity}
+                    ₹{item.fruit.sellingPrice * item.quantity}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="space-y-4 mb-6 text-gray-600 font-medium border-t border-b border-orange-50 py-6">
+            <div className="space-y-4 mb-6 text-gray-600 font-medium border-b border-orange-50 pb-6">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span className="font-bold text-gray-900">₹{subtotal.toFixed(2)}</span>

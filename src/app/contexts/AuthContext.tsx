@@ -35,7 +35,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     LocalDB.init();
     const sessionUser = localStorage.getItem('fruitSession');
     if (sessionUser && token) {
-      setUser(JSON.parse(sessionUser));
+      if (token.startsWith('token_')) {
+        // User has an old dummy token from LocalDB, force them to login again
+        logout();
+      } else {
+        setUser(JSON.parse(sessionUser));
+        
+        // Ensure the full user object is saved for api.ts
+        if (!localStorage.getItem('user')) {
+          localStorage.setItem('user', JSON.stringify({ ...JSON.parse(sessionUser), token }));
+        }
+      }
     } else {
       logout();
     }
@@ -44,22 +54,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const users = LocalDB.getUsers();
-      const user = users.find(u => u.email === email && u.password === password);
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
       
-      if (user) {
-        const dummyToken = `token_${Date.now()}`;
-        
-        // Remove password from session
-        const { password: _, ...userWithoutPassword } = user;
-        
-        setToken(dummyToken);
-        setUser(userWithoutPassword as User);
-        localStorage.setItem('token', dummyToken);
-        localStorage.setItem('fruitSession', JSON.stringify(userWithoutPassword));
+      if (res.ok) {
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('fruitSession', JSON.stringify(data.user));
+        // Save the full user object including token for getAuthHeaders in api.ts
+        localStorage.setItem('user', JSON.stringify({ ...data.user, token: data.token }));
         return { success: true };
       }
-      return { success: false, error: 'Invalid email or password' };
+      return { success: false, error: data.error || 'Invalid email or password' };
     } catch {
       return { success: false, error: 'An error occurred during login' };
     }
@@ -67,33 +78,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (name: string, email: string, password: string, phone: string) => {
     try {
-      const users = LocalDB.getUsers();
+      const res = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, phone })
+      });
+      const data = await res.json();
       
-      if (users.find(u => u.email === email)) {
-        return { success: false, error: 'Email already exists' };
+      if (res.ok) {
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('fruitSession', JSON.stringify(data.user));
+        localStorage.setItem('user', JSON.stringify({ ...data.user, token: data.token }));
+        return { success: true };
       }
-
-      const newUser: User = {
-        id: Date.now(),
-        name,
-        email,
-        password,
-        phone,
-        role: 'customer'
-      };
-
-      users.push(newUser);
-      LocalDB.saveUsers(users);
-
-      const dummyToken = `token_${Date.now()}`;
-      
-      const { password: _, ...userWithoutPassword } = newUser;
-      
-      setToken(dummyToken);
-      setUser(userWithoutPassword as User);
-      localStorage.setItem('token', dummyToken);
-      localStorage.setItem('fruitSession', JSON.stringify(userWithoutPassword));
-      return { success: true };
+      return { success: false, error: data.error || 'Email already exists' };
     } catch {
       return { success: false, error: 'An error occurred during registration' };
     }

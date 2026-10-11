@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from '../navigation';
 import { useAuth, API_URL } from '../contexts/AuthContext';
 import { ShoppingCart, Trash2, Plus, Minus, MapPin, Phone, FileText, Loader2, CheckCircle, ArrowLeft, Package } from 'lucide-react';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 interface Fruit {
   id: number;
   name: string;
-  price: number;
+  sellingPrice: number;
   unit: string;
-  stock_kg: number;
+  quantity: number;
   image_url: string;
 }
 
@@ -53,7 +54,7 @@ export default function BulkOrderPage() {
           if (item.fruit.id === fruitId) {
             const newQty = item.quantity + delta;
             if (newQty <= 0) return null;
-            return { ...item, quantity: Math.min(newQty, item.fruit.stock_kg) };
+            return { ...item, quantity: Math.min(newQty, item.fruit.quantity) };
           }
           return item;
         })
@@ -70,13 +71,13 @@ export default function BulkOrderPage() {
     setCart(prev =>
       prev.map(item =>
         item.fruit.id === fruitId
-          ? { ...item, quantity: Math.min(Math.max(0, qty), item.fruit.stock_kg) }
+          ? { ...item, quantity: Math.min(Math.max(0, qty), item.fruit.quantity) }
           : item
       )
     );
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.fruit.price * item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + item.fruit.sellingPrice * item.quantity, 0);
 
   const handlePlaceOrder = async () => {
     if (cart.length === 0) {
@@ -202,15 +203,15 @@ export default function BulkOrderPage() {
                 key={item.fruit.id}
                 className="bg-white rounded-xl shadow-sm border border-orange-50 p-4 flex gap-4 items-center hover:shadow-md transition-shadow"
               >
-                <img
+                <ImageWithFallback
                   src={item.fruit.image_url}
                   alt={item.fruit.name}
                   className="w-20 h-20 rounded-xl object-cover"
                 />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-orange-900">{item.fruit.name}</h3>
-                  <p className="text-green-700 font-semibold">₹{item.fruit.price} {item.fruit.unit}</p>
-                  <p className="text-xs text-gray-400">Stock: {item.fruit.stock_kg}kg</p>
+                  <p className="text-green-700 font-semibold">₹{item.fruit.sellingPrice} {item.fruit.unit}</p>
+                  <p className="text-xs text-gray-400">Stock: {item.fruit.quantity}kg</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -225,7 +226,7 @@ export default function BulkOrderPage() {
                     onChange={(e) => setQuantity(item.fruit.id, e.target.value)}
                     className="w-16 text-center py-1.5 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-900"
                     min="1"
-                    max={item.fruit.stock_kg}
+                    max={item.fruit.quantity}
                   />
                   <button
                     onClick={() => updateQuantity(item.fruit.id, 1)}
@@ -235,7 +236,7 @@ export default function BulkOrderPage() {
                   </button>
                 </div>
                 <div className="text-right min-w-[80px]">
-                  <p className="font-bold text-orange-900">₹{(item.fruit.price * item.quantity).toFixed(0)}</p>
+                  <p className="font-bold text-orange-900">₹{(item.fruit.sellingPrice * item.quantity).toFixed(0)}</p>
                 </div>
                 <button
                   onClick={() => removeFromCart(item.fruit.id)}
@@ -309,7 +310,7 @@ export default function BulkOrderPage() {
                 {cart.map(item => (
                   <div key={item.fruit.id} className="flex justify-between text-sm text-orange-100">
                     <span>{item.fruit.name} × {item.quantity}</span>
-                    <span>₹{(item.fruit.price * item.quantity).toFixed(0)}</span>
+                    <span>₹{(item.fruit.sellingPrice * item.quantity).toFixed(0)}</span>
                   </div>
                 ))}
               </div>

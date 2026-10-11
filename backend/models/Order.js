@@ -14,6 +14,10 @@ const orderItemSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  purchase_price_at_order: {
+    type: Number,
+    required: true,
+  },
 });
 
 // Since the old SQLite database sent these fields to the frontend, 
@@ -49,6 +53,17 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  delivery_fee: {
+    type: Number,
+    default: 0,
+  },
+  discount: {
+    type: Number,
+    default: 0,
+  },
+  coupon_code: {
+    type: String,
+  },
   delivery_address: {
     type: String,
   },
@@ -59,8 +74,16 @@ const orderSchema = new mongoose.Schema({
     type: String,
   },
   items: [orderItemSchema], // Embed items directly into the order!
+  timeline: {
+    placed_at: { type: Date, default: Date.now },
+    confirmed_at: { type: Date },
+    processing_at: { type: Date },
+    out_for_delivery_at: { type: Date },
+    delivered_at: { type: Date },
+    cancelled_at: { type: Date }
+  }
 }, {
-  timestamps: { createdAt: 'created_at', updatedAt: false },
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   toJSON: { virtuals: true },
   toObject: { virtuals: true },
 });

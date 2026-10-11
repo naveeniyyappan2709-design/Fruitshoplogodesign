@@ -1,10 +1,11 @@
-import { Link, useLocation } from './navigation';
+import { Link, useLocation, useNavigate } from './navigation';
 import { useAuth } from './contexts/AuthContext';
-import { Apple, Leaf, Phone, Mail, LogIn, LogOut, User, ShoppingCart, LayoutDashboard, Package, Home, Menu, X } from 'lucide-react';
+import { Apple, Leaf, Phone, Mail, LogIn, LogOut, User, ShoppingCart, LayoutDashboard, Package, Home, Menu, X, Heart, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
+import AdminLoginPage from './pages/AdminLoginPage';
 import RegisterPage from './pages/RegisterPage';
 import FruitCollectionPage from './pages/FruitCollectionPage';
 import BulkOrderPage from './pages/BulkOrderPage';
@@ -13,18 +14,19 @@ import AdminDashboard from './pages/AdminDashboard';
 import ProductDetailsPage from './pages/ProductDetailsPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
-import { LocalDB } from './utils/localStorageDB';
+import { api } from './utils/api';
 
 export default function App() {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
     const updateCartCount = () => {
-      const cart = LocalDB.getCart();
-      setCartCount(cart.reduce((sum, item) => sum + item.quantity, 0));
+      const cart = api.getCart();
+      setCartCount(cart.reduce((sum: any, item: any) => sum + item.quantity, 0));
     };
     updateCartCount();
     window.addEventListener('cartUpdated', updateCartCount);
@@ -33,10 +35,10 @@ export default function App() {
 
   const navLinks = [
     { to: '/', label: 'Home', icon: <Home className="w-4 h-4" /> },
-    { to: '/collection', label: 'Fruits', icon: <Leaf className="w-4 h-4" /> },
+    { to: '/collection', label: 'Categories', icon: <Leaf className="w-4 h-4" /> },
     ...(isAuthenticated
       ? [
-          { to: '/orders', label: 'My Orders', icon: <Package className="w-4 h-4" /> },
+          { to: '/orders', label: 'Orders', icon: <Package className="w-4 h-4" /> },
         ]
       : []),
     ...(isAdmin
@@ -51,25 +53,29 @@ export default function App() {
       {/* Header */}
       <header className="bg-gradient-to-r from-orange-600 to-amber-500 text-white py-4 px-4 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity flex-shrink-0">
               <div className="bg-white rounded-xl overflow-hidden shadow-md w-12 h-12 flex items-center justify-center">
                 <img src="/fruits/logo_mkv.png" alt="MKV Fruits" className="w-full h-full object-contain p-1" />
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <h1 className="text-xl font-bold leading-tight">MKV fruits</h1>
                 <p className="text-orange-100 text-xs text-nowrap">रोज़ ताज़ा फल • Daily Fresh</p>
               </div>
             </Link>
 
+            {/* Global Search Bar (Removed) */}
+            <div className="hidden md:flex flex-1 max-w-2xl mx-4">
+            </div>
+
             {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex items-center gap-1 flex-shrink-0">
               {navLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                     isActive(link.to)
                       ? 'bg-white/20 text-white'
                       : 'text-orange-100 hover:bg-white/10 hover:text-white'
@@ -80,29 +86,50 @@ export default function App() {
                 </Link>
               ))}
 
+              {/* Wishlist Button */}
+              {isAuthenticated && (
+                <Link
+                  to="/collection"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all text-orange-100 hover:bg-white/10 hover:text-white"
+                  title="Wishlist (Collection)"
+                >
+                  <Heart className="w-4 h-4" />
+                  Wishlist
+                </Link>
+              )}
+
               {/* Auth Button */}
               {isAuthenticated ? (
-                <div className="flex items-center gap-2 ml-2 pl-2 border-l border-orange-400">
-                  <span className="text-sm text-orange-100 flex items-center gap-1">
-                    <User className="w-4 h-4" />
+                <div className="flex items-center gap-2 ml-1 pl-2 border-l border-orange-400">
+                  <span className="text-sm text-orange-100 flex items-center gap-1 font-semibold max-w-[100px] truncate">
+                    <User className="w-4 h-4 flex-shrink-0" />
                     {user?.name}
                   </span>
                   <button
                     onClick={logout}
-                    className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                    className="flex items-center gap-1.5 hover:bg-white/25 px-2 py-2 rounded-xl text-sm font-medium transition-all text-orange-100 hover:text-white"
+                    title="Logout"
                   >
                     <LogOut className="w-4 h-4" />
-                    Logout
                   </button>
                 </div>
               ) : (
-                <Link
-                  to="/login"
-                  className="flex items-center gap-1.5 bg-white text-orange-600 hover:bg-orange-50 px-5 py-2 rounded-xl text-sm font-bold transition-all ml-2 shadow-md"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </Link>
+                <>
+                  <Link
+                    to="/admin/login"
+                    className="flex items-center gap-1.5 bg-white/10 text-orange-100 hover:bg-white/20 hover:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all ml-2"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Admin
+                  </Link>
+                  <Link
+                    to="/login"
+                    className="flex items-center gap-1.5 bg-white text-orange-600 hover:bg-orange-50 px-4 py-2 rounded-xl text-sm font-bold transition-all ml-2 shadow-md"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Sign In
+                  </Link>
+                </>
               )}
 
               {/* Cart Button */}
@@ -111,13 +138,13 @@ export default function App() {
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ml-2 relative ${
                   isActive('/cart')
                     ? 'bg-white/20 text-white'
-                    : 'bg-white text-orange-600 hover:bg-orange-50'
+                    : 'bg-white text-orange-600 hover:bg-orange-50 shadow-md'
                 }`}
               >
                 <ShoppingCart className="w-5 h-5" />
                 <span className="font-bold">Cart</span>
                 {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-orange-500 shadow-md">
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-orange-500 shadow-sm">
                     {cartCount}
                   </span>
                 )}
@@ -213,6 +240,7 @@ export default function App() {
       <main>
         {location.pathname === '/' && <HomePage />}
         {location.pathname === '/login' && <LoginPage />}
+        {location.pathname === '/admin/login' && <AdminLoginPage />}
         {location.pathname === '/register' && <RegisterPage />}
         {location.pathname === '/collection' && <FruitCollectionPage />}
         {location.pathname === '/cart' && <CartPage />}
@@ -221,7 +249,7 @@ export default function App() {
         {location.pathname === '/bulk-order' && <BulkOrderPage />}
         {location.pathname === '/orders' && <OrderHistoryPage />}
         {location.pathname === '/admin' && <AdminDashboard />}
-        {!['/', '/login', '/register', '/collection', '/cart', '/checkout', '/bulk-order', '/orders', '/admin'].includes(location.pathname) && !location.pathname.startsWith('/product/') && <HomePage />}
+        {!['/', '/login', '/admin/login', '/register', '/collection', '/cart', '/checkout', '/bulk-order', '/orders', '/admin'].includes(location.pathname) && !location.pathname.startsWith('/product/') && <HomePage />}
       </main>
 
       {/* Footer */}
@@ -241,6 +269,11 @@ export default function App() {
               <Mail className="w-5 h-5" />
               <span>naveeniyyappan2709@gmail.com</span>
             </a>
+            <span className="hidden md:inline text-orange-700">|</span>
+            <Link to="/admin/login" className="flex items-center gap-2 hover:text-white transition-colors text-orange-300">
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="text-sm font-medium">Admin Portal</span>
+            </Link>
           </div>
         </div>
       </footer>

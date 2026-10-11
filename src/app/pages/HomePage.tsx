@@ -21,7 +21,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 
-import { LocalDB, Fruit, Review } from '../utils/localStorageDB';
+import { api } from '../utils/api';
 
 interface SiteReview {
   _id: string;
@@ -32,9 +32,9 @@ interface SiteReview {
 
 export default function HomePage() {
   const { isAuthenticated, token } = useAuth();
-  const [trending, setTrending] = useState<Fruit[]>([]);
-  const [budget, setBudget] = useState<Fruit[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [trending, setTrending] = useState<any[]>([]);
+  const [budget, setBudget] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [siteReviews, setSiteReviews] = useState<SiteReview[]>([]);
   const [siteAvgRating, setSiteAvgRating] = useState(0);
   const [siteTotalReviews, setSiteTotalReviews] = useState(0);
@@ -47,15 +47,13 @@ export default function HomePage() {
 
   const fetchSiteReviews = async () => {
     try {
-      const allReviews = JSON.parse(localStorage.getItem('fruitReviews') || '[]');
-      const siteRev = allReviews.filter((r: any) => !r.fruit_id); // General site reviews
-      
-      const total = siteRev.length;
-      const avg = total > 0 ? siteRev.reduce((acc: number, r: any) => acc + r.rating, 0) / total : 4.5;
-      
-      setSiteReviews(siteRev);
-      setSiteAvgRating(avg);
-      setSiteTotalReviews(total);
+      const res = await fetch(`${API_URL}/site-reviews`);
+      if (res.ok) {
+        const data = await res.json();
+        setSiteReviews(data.reviews);
+        setSiteAvgRating(data.averageRating);
+        setSiteTotalReviews(data.totalReviews);
+      }
     } catch (err) {
       console.error('Failed to fetch site reviews:', err);
     }
@@ -64,18 +62,25 @@ export default function HomePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const allFruits = LocalDB.getProducts();
-        
-        // Mock recommendation logic
-        const sortedByRating = [...allFruits].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        setTrending(sortedByRating.slice(0, 4));
-        
-        const sortedByPrice = [...allFruits].sort((a, b) => a.price - b.price);
-        setBudget(sortedByPrice.slice(0, 4));
-        
-        const allReviews = JSON.parse(localStorage.getItem('fruitReviews') || '[]');
-        setReviews(allReviews.filter((r: any) => r.fruit_id));
-        
+        const [fruitsRes, reviewsRes] = await Promise.all([
+          fetch(`${API_URL}/fruits?all=true`),
+          fetch(`${API_URL}/reviews`)
+        ]);
+
+        if (fruitsRes.ok) {
+          const allFruits = (await fruitsRes.json()).fruits;
+          const sortedByRating = [...allFruits].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          setTrending(sortedByRating.slice(0, 4));
+          
+          const sortedByPrice = [...allFruits].sort((a, b) => a.sellingPrice - b.sellingPrice);
+          setBudget(sortedByPrice.slice(0, 4));
+        }
+
+        if (reviewsRes.ok) {
+          const allReviews = (await reviewsRes.json()).reviews;
+          setReviews(allReviews);
+        }
+
         await fetchSiteReviews();
       } catch (err) {
         console.error('Failed to fetch home data:', err);
@@ -92,22 +97,20 @@ export default function HomePage() {
     if (!isAuthenticated) return;
     setSubmittingReview(true);
     try {
-      const allReviews = JSON.parse(localStorage.getItem('fruitReviews') || '[]');
-      const sessionUserStr = localStorage.getItem('fruitSession');
-      const sessionUser = sessionUserStr ? JSON.parse(sessionUserStr) : null;
-      
-      allReviews.push({
-        _id: Date.now().toString(),
-        user_id: { name: sessionUser?.name || 'Anonymous' },
-        rating: newReviewRating,
-        comment: newReviewComment
+      const res = await fetch(`${API_URL}/site-reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ rating: newReviewRating, comment: newReviewComment })
       });
-      
-      localStorage.setItem('fruitReviews', JSON.stringify(allReviews));
-      
-      setNewReviewComment('');
-      setNewReviewRating(5);
-      fetchSiteReviews();
+
+      if (res.ok) {
+        setNewReviewComment('');
+        setNewReviewRating(5);
+        fetchSiteReviews();
+      }
     } catch (err) {
       console.error('Failed to submit site review:', err);
     } finally {
@@ -226,6 +229,30 @@ export default function HomePage() {
 
       <main className="max-w-7xl mx-auto px-6 py-20 w-full flex flex-col gap-24">
         
+        {/* Shop by Category */}
+        <section>
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-black text-orange-950 mb-2">Shop by Category</h2>
+            <p className="text-orange-700/70 font-medium">Explore our wide variety of fresh fruits</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { name: 'Everyday Fruits', icon: '🍌', filter: 'everyday' },
+              { name: 'Seasonal Picks', icon: '🥭', filter: 'seasonal' },
+              { name: 'Exotic Imports', icon: '🥝', filter: 'exotic' },
+              { name: 'All Fresh', icon: '🍎', filter: 'all' },
+            ].map((cat) => (
+              <Link to={`/collection?category=${cat.filter}`} key={cat.name}>
+                <div className="bg-white rounded-[2rem] p-8 flex flex-col items-center justify-center text-center gap-4 hover:bg-orange-50 transition-colors border border-orange-100 shadow-sm hover:shadow-md group cursor-pointer h-full">
+                  <div className="text-5xl group-hover:scale-110 transition-transform duration-300 drop-shadow-md">
+                    {cat.icon}
+                  </div>
+                  <h3 className="font-bold text-orange-950 text-lg">{cat.name}</h3>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
         {/* Trending Section - "Daily Sales Info" */}
         <section>
           <div className="flex items-end justify-between mb-12">
@@ -244,10 +271,10 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {trending.map((fruit) => (
-              <div key={fruit.id} className="group relative">
+              <div key={fruit._id} className="group relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-orange-400 to-amber-400 rounded-3xl blur opacity-0 group-hover:opacity-20 transition duration-500" />
                 <Card className="relative h-full border-none shadow-xl shadow-orange-900/5 rounded-3xl overflow-hidden group-hover:shadow-2xl group-hover:shadow-orange-900/10 transition-all duration-500 hover:-translate-y-2 flex flex-col">
-                  <Link to={`/product/${fruit.id}`} className="block flex-1">
+                  <Link to={`/product/${fruit._id}`} className="block flex-1">
                     <div className="aspect-[4/5] overflow-hidden relative">
                       <ImageWithFallback
                         src={fruit.image_url}
@@ -267,16 +294,16 @@ export default function HomePage() {
                   </Link>
                   <div className="p-6 bg-white flex justify-between items-center mt-auto border-t border-orange-50">
                     <div>
-                      <span className="text-3xl font-black text-orange-950">₹{fruit.price}</span>
+                      <span className="text-3xl font-black text-orange-950">₹{fruit.sellingPrice}</span>
                       <span className="text-xs font-bold text-gray-400 ml-1">/{fruit.unit.replace('per ', '')}</span>
                     </div>
                     <button 
                       onClick={() => {
-                        LocalDB.addToCart(fruit, 1);
+                        api.addToCart(fruit, 1);
                         alert(`${fruit.name} added to cart`);
                       }}
-                      disabled={fruit.stock_kg <= 0}
-                      className={`p-3 rounded-2xl transition-all ${fruit.stock_kg > 0 ? 'bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
+                      disabled={fruit.quantity <= 0}
+                      className={`p-3 rounded-2xl transition-all ${fruit.quantity > 0 ? 'bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
                       <ShoppingBag className="w-5 h-5" />
                     </button>
                   </div>
@@ -387,9 +414,9 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {budget.map((fruit) => (
-              <Card key={fruit.id} className="border-none shadow-lg overflow-hidden flex flex-row group h-48 rounded-[2rem]">
+              <Card key={fruit._id} className="border-none shadow-lg overflow-hidden flex flex-row group h-48 rounded-[2rem]">
                 <div className="w-1/3 overflow-hidden">
-                  <Link to={`/product/${fruit.id}`} className="block w-full h-full">
+                  <Link to={`/product/${fruit._id}`} className="block w-full h-full">
                     <ImageWithFallback
                       src={fruit.image_url}
                       alt={fruit.name}
@@ -403,23 +430,23 @@ export default function HomePage() {
                   </div>
                   <div>
                     <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none mb-2 font-bold uppercase tracking-tighter">Budget Pick</Badge>
-                    <Link to={`/product/${fruit.id}`}>
+                    <Link to={`/product/${fruit._id}`}>
                       <h3 className="text-2xl font-black text-orange-950 hover:text-orange-600 transition-colors">{fruit.name}</h3>
                     </Link>
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-3xl font-black text-green-700">₹{fruit.price}</span>
+                      <span className="text-3xl font-black text-green-700">₹{fruit.sellingPrice}</span>
                       <span className="text-sm font-bold text-gray-400">/{fruit.unit.replace('per ', '')}</span>
                     </div>
                     <button 
                       onClick={() => {
-                        LocalDB.addToCart(fruit, 1);
+                        api.addToCart(fruit, 1);
                         alert(`${fruit.name} added to cart`);
                       }}
-                      disabled={fruit.stock_kg <= 0}
+                      disabled={fruit.quantity <= 0}
                       className="font-black text-sm text-orange-600 hover:translate-x-2 transition-transform underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
-                      {fruit.stock_kg > 0 ? 'Grab Deal' : 'Out of Stock'}
+                      {fruit.quantity > 0 ? 'Grab Deal' : 'Out of Stock'}
                     </button>
                   </div>
                 </div>
@@ -473,7 +500,7 @@ export default function HomePage() {
                   </p>
                   <div className="mt-6 flex items-center gap-2 pt-4 border-t border-white/5">
                     <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10">
-                      <img src={review.fruit_id?.image_url} alt={review.fruit_id?.name} className="w-full h-full object-cover" />
+                      <ImageWithFallback src={review.fruit_id?.image_url} alt={review.fruit_id?.name} className="w-full h-full object-cover" />
                     </div>
                     <span className="text-[10px] uppercase font-black text-amber-400 tracking-widest">Reviewed {review.fruit_id?.name}</span>
                   </div>

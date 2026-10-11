@@ -9,7 +9,11 @@ const fruitSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
-  price: {
+  purchasePrice: {
+    type: Number,
+    required: true,
+  },
+  sellingPrice: {
     type: Number,
     required: true,
   },
@@ -17,7 +21,7 @@ const fruitSchema = new mongoose.Schema({
     type: String,
     default: 'per kg',
   },
-  stock_kg: {
+  quantity: {
     type: Number,
     default: 0,
   },
@@ -27,12 +31,12 @@ const fruitSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['seasonal', 'everyday', 'exotic'],
     default: 'everyday',
   },
-  available: {
-    type: Number,
-    default: 1, // 1 for true, 0 for false to maintain frontend compatibility
+  status: {
+    type: String,
+    enum: ['Available', 'Out of Stock'],
+    default: 'Available',
   },
   rating: {
     type: Number,
@@ -41,6 +45,29 @@ const fruitSchema = new mongoose.Schema({
   is_deal: {
     type: Boolean,
     default: false,
+  },
+  minStock: {
+    type: Number,
+    default: 10,
+  },
+  originalPrice: {
+    type: Number,
+  },
+  discount: {
+    type: Number,
+    default: 0,
+  },
+  supplier: {
+    type: String,
+    default: '',
+  },
+  totalSoldAllTime: {
+    type: Number,
+    default: 0,
+  },
+  totalSoldToday: {
+    type: Number,
+    default: 0,
   },
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: false },
